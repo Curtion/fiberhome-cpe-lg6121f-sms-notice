@@ -1,8 +1,12 @@
 package main
 
 import (
+	"encoding/json"
 	"flag"
+	"fmt"
+	"io"
 	"log"
+	"net/http"
 	"strings"
 	"time"
 )
@@ -11,17 +15,19 @@ var (
 	username string
 	password string
 	waitTime int
+	brakKey  string
+	url      string
 )
 
 func init() {
 	flag.StringVar(&username, "u", "", "username")
 	flag.StringVar(&password, "p", "", "password")
 	flag.IntVar(&waitTime, "w", 10, "wait time")
+	flag.StringVar(&brakKey, "b", "", "bark key")
+	flag.StringVar(&url, "url", "http://192.168.8.1", "5g cpe url")
 }
 
 func main() {
-	// {"dataObj":{"url":{"smsIsopend11":"InternetGatewayDevice.X_FH_MobileNetwork.SMS_Recv.SMS_RecvMsg.11.isOpened"},"value":{"smsIsopend11":"1"}},"ajaxmethod":"set_value_by_xmlnode","sessionid":"7IdwD0laV80U5Mqp3mDl65QtcLRHO5z0"}
-	// {"success":"true"}
 	flag.Parse()
 	logout := make(chan bool)
 	go login(logout)
@@ -54,7 +60,7 @@ func login(logout chan bool) {
 	if status == "1" {
 		panic("当前已有用户在别处登录，请稍后登录")
 	} else if status == "2" {
-		panic("您的连续错误登录次数已经达到3次，请1分钟后再试")
+		panic("您的连续错误登录次数已经达到3次, 请1分钟后再试")
 	} else if status == "3" {
 		panic("管理帐号已被禁用，请另选帐号登录")
 	} else if status == "4" {
@@ -64,7 +70,7 @@ func login(logout chan bool) {
 	} else if status == "0" {
 		log.Print("登录成功")
 	}
-	go getSms()
+	go watchSms()
 	for {
 		islogin, err := requestGet("/api/tmp/IS_LOGGED_IN")
 		if err != nil {
@@ -87,30 +93,92 @@ func login(logout chan bool) {
 	}
 }
 
-func getSms() {
+type NewSmsFlag struct {
+	NewSmsFlag string `json:"new_sms_flag"`
+}
+
+func watchSms() {
 	for {
 		smsFlag, err := requestGet("/api/tmp/FHAPIS?ajaxmethod=get_new_sms")
 		if err != nil {
 			log.Fatal(err)
 		}
-		log.Print("短信提醒: ", strings.TrimSpace(smsFlag))
+		var data = new(NewSmsFlag)
+		err = json.Unmarshal([]byte(smsFlag), data)
+		if err != nil {
+			log.Fatal(err)
+		}
+		log.Print("是否有新短信: ", strings.TrimSpace(data.NewSmsFlag))
+		if strings.TrimSpace(data.NewSmsFlag) == "true" {
+			smsNotice()
+		}
 		<-time.After(3 * time.Second)
 	}
-	// sms, err := requestPost(nil, "/api/tmp/FHAPIS", "get_sms_data")
-	// if err != nil {
-	// 	log.Fatal(err)
-	// }
-	// log.Print("短信: ", sms)
 }
 
-// func testDecrypt() {
-// 	byteSlice, err := hex.DecodeString("B1BFD5D292A1A4C0BFE0838BA88E8C5AD2F49595E143C090E9F9590726A93226")
-// 	if err != nil {
-// 		panic("Failed to decode hex string: " + err.Error())
-// 	}
-// 	test, err := decryptFunc(byteSlice, []byte("7IdwD0laV80U5Mqp3mDl65QtcLRHO5z0"[0:16]), iv)
-// 	if err != nil {
-// 		log.Fatal(err)
-// 	}
-// 	fmt.Printf("测试解密: %s\n", test)
-// }
+func smsNotice() {
+	sms, err := requestPost(nil, "/api/tmp/FHAPIS", "get_sms_data")
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	var msg map[string]interface{}
+	err = json.Unmarshal([]byte(sms), &msg)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	for _, v := range msg {
+		for _, vv := range v.(map[string]interface{}) {
+			if m, ok := vv.(map[string]interface{}); ok {
+				if m["rcvorsend"] == "recv" {
+					if m["isOpened"] == "0" {
+						log.Print("--------------------新短信--------------------")
+						log.Print("短信号码: ", v.(map[string]interface{})["session_phone"])
+						log.Print("短信内容: ", m["msg_content"])
+						log.Print("短信时间: ", m["time"])
+						log.Print("短信ID: ", m["childnode"])
+						log.Print("--------------------------------------------")
+						barkNotice(v.(map[string]interface{})["session_phone"].(string), m["msg_content"].(string))
+						readSms(m["childnode"].(string))
+					}
+				}
+			}
+		}
+	}
+}
+
+func readSms(id string) {
+	var data = map[string]interface{}{
+		"url": map[string]interface{}{
+			"smsIsopend" + id: "InternetGatewayDevice.X_FH_MobileNetwork.SMS_Recv.SMS_RecvMsg." + id + ".isOpened",
+		},
+		"value": map[string]interface{}{
+			"smsIsopend" + id: "1",
+		},
+	}
+	res, err := requestPost(data, "/api/tmp/FHAPIS", "set_value_by_xmlnode")
+	if err != nil {
+		log.Fatal(err)
+	}
+	log.Printf("短信[%s]已读: %s", id, res)
+}
+
+func barkNotice(title, content string) (string, error) {
+	if brakKey == "" {
+		return "", fmt.Errorf("bark key is empty")
+	}
+	url := fmt.Sprintf("https://api.day.app/%s/%s/%s?level=timeSensitive", brakKey, title, content)
+	resp, err := http.Get(url)
+	if err != nil {
+		return "", err
+	}
+	defer resp.Body.Close()
+
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return "", err
+	}
+
+	return string(body), nil
+}

@@ -11,8 +11,7 @@ import (
 )
 
 var (
-	url = "http://192.168.8.1"
-	iv  = []byte(intAesIV())
+	iv = []byte(intAesIV())
 )
 
 type session struct {
