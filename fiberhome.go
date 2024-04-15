@@ -37,6 +37,9 @@ func requestGet(path string) (string, error) {
 		return "", err
 	}
 	defer resp.Body.Close()
+	if resp.StatusCode != 200 {
+		return "", fmt.Errorf("请求:%v错误: HTTP Code: %v", path, resp.StatusCode)
+	}
 
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
