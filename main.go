@@ -54,7 +54,7 @@ func login(logout chan bool) {
 
 	loginInfo, err := requestPost(user, "/api/sign/DO_WEB_LOGIN", "DO_WEB_LOGIN")
 	if err != nil {
-		log.Fatal(err)
+		log.Print(err)
 	}
 	status := strings.Split(loginInfo, "|")[0]
 	if status == "1" {
@@ -70,23 +70,25 @@ func login(logout chan bool) {
 	} else if status == "0" {
 		log.Print("登录成功")
 	}
-	go watchSms()
+	cancel := make(chan bool)
+	go watchSms(cancel)
 	for {
 		islogin, err := requestGet("/api/tmp/IS_LOGGED_IN")
 		if err != nil {
-			log.Fatal(err)
+			log.Print(err)
 		}
 		log.Print("是否登录: ", strings.TrimSpace(islogin))
 
 		hb, err := requestGet("/api/tmp/heartbeat")
 		if err != nil {
-			log.Fatal(err)
+			log.Print(err)
 		}
 		log.Print("心跳请求: ", strings.TrimSpace(hb))
 
 		if strings.TrimSpace(islogin) == "0" || strings.TrimSpace(hb) != "true" {
+			close(cancel)
 			logout <- true
-			break
+			return
 		}
 
 		<-time.After(3 * time.Second)
@@ -97,35 +99,42 @@ type NewSmsFlag struct {
 	NewSmsFlag string `json:"new_sms_flag"`
 }
 
-func watchSms() {
+func watchSms(cancel chan bool) {
 	for {
-		smsFlag, err := requestGet("/api/tmp/FHAPIS?ajaxmethod=get_new_sms")
-		if err != nil {
-			log.Fatal(err)
+		select {
+		case <-cancel:
+			log.Print("退出监听短信")
+			return
+		default:
+			smsFlag, err := requestGet("/api/tmp/FHAPIS?ajaxmethod=get_new_sms")
+			if err != nil {
+				log.Print(err)
+			}
+			var data = new(NewSmsFlag)
+			err = json.Unmarshal([]byte(smsFlag), data)
+			if err != nil {
+				log.Print(err)
+			}
+			log.Print("是否有新短信: ", strings.TrimSpace(data.NewSmsFlag))
+			if strings.TrimSpace(data.NewSmsFlag) == "true" {
+				smsNotice()
+			}
+			<-time.After(3 * time.Second)
 		}
-		var data = new(NewSmsFlag)
-		err = json.Unmarshal([]byte(smsFlag), data)
-		if err != nil {
-			log.Fatal(err)
-		}
-		log.Print("是否有新短信: ", strings.TrimSpace(data.NewSmsFlag))
-		if strings.TrimSpace(data.NewSmsFlag) == "true" {
-			smsNotice()
-		}
-		<-time.After(3 * time.Second)
+
 	}
 }
 
 func smsNotice() {
 	sms, err := requestPost(nil, "/api/tmp/FHAPIS", "get_sms_data")
 	if err != nil {
-		log.Fatal(err)
+		log.Print(err)
 	}
 
 	var msg map[string]interface{}
 	err = json.Unmarshal([]byte(sms), &msg)
 	if err != nil {
-		log.Fatal(err)
+		log.Print(err)
 	}
 
 	for _, v := range msg {
@@ -159,7 +168,7 @@ func readSms(id string) {
 	}
 	res, err := requestPost(data, "/api/tmp/FHAPIS", "set_value_by_xmlnode")
 	if err != nil {
-		log.Fatal(err)
+		log.Print(err)
 	}
 	log.Printf("短信[%s]已读: %s", id, res)
 }

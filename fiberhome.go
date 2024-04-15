@@ -58,7 +58,7 @@ type body struct {
 func requestPost(dataObj interface{}, path string, ajaxmethod string) (string, error) {
 	sessionId, err := getSessionId()
 	if err != nil {
-		log.Fatal(err)
+		log.Print(err)
 	}
 
 	data := body{
