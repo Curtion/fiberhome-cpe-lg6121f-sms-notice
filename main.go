@@ -106,22 +106,21 @@ func watchSms(cancel chan bool) {
 			log.Print("退出监听短信")
 			return
 		default:
-			smsFlag, err := requestGet("/api/tmp/FHAPIS?ajaxmethod=get_new_sms")
-			if err != nil {
-				log.Print(err)
-			}
-			var data = new(NewSmsFlag)
-			err = json.Unmarshal([]byte(smsFlag), data)
-			if err != nil {
-				log.Print(err)
-			}
-			log.Print("是否有新短信: ", strings.TrimSpace(data.NewSmsFlag))
-			if strings.TrimSpace(data.NewSmsFlag) == "true" {
-				smsNotice()
-			}
-			<-time.After(3 * time.Second)
 		}
-
+		smsFlag, err := requestGet("/api/tmp/FHAPIS?ajaxmethod=get_new_sms")
+		if err != nil {
+			log.Print(err)
+		}
+		var data = new(NewSmsFlag)
+		err = json.Unmarshal([]byte(smsFlag), data)
+		if err != nil {
+			log.Print(err)
+		}
+		log.Print("是否有新短信: ", strings.TrimSpace(data.NewSmsFlag))
+		if strings.TrimSpace(data.NewSmsFlag) == "true" {
+			smsNotice()
+		}
+		<-time.After(3 * time.Second)
 	}
 }
 
