@@ -27,3 +27,5 @@ jobs:
       uses: softprops/action-gh-release@v2
       with:
         files: fh_sms_notice
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
