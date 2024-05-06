@@ -147,7 +147,12 @@ func smsNotice() {
 						log.Print("短信时间: ", m["time"])
 						log.Print("短信ID: ", m["childnode"])
 						log.Print("--------------------------------------------")
-						barkNotice(v.(map[string]interface{})["session_phone"].(string), m["msg_content"].(string))
+						res, err := barkNotice(v.(map[string]interface{})["session_phone"].(string), m["msg_content"].(string))
+						if err != nil {
+							log.Print(err)
+						} else {
+							log.Print("bark通知: ", res)
+						}
 						readSms(m["childnode"].(string))
 					}
 				}
