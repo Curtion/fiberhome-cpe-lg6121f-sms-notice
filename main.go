@@ -29,11 +29,18 @@ func init() {
 
 func main() {
 	flag.Parse()
-	logout := make(chan bool)
+	logout := make(chan int64)
 	go login(logout)
 
 	for {
-		<-logout
+		t := <-logout
+		now := time.Now().UnixMilli()
+		log.Printf("上次登录时间: %s", time.UnixMilli(t).Format("2006/01/02 15:04:05"))
+		if (now-t) < 1000*60*5+1000*10 && (now-t) > 1000*60*4+1000*50 {
+			log.Printf("登录会话过期, 立即重新登录")
+			go login(logout)
+			continue
+		}
 		log.Printf("账号在其它地方登录, 等待%d分钟后重新登录", waitTime)
 		<-time.After(time.Duration(waitTime) * time.Minute)
 		go login(logout)
@@ -46,7 +53,7 @@ type userLogin struct {
 	Password string `json:"password"`
 }
 
-func login(logout chan bool) {
+func login(logout chan int64) {
 	user := userLogin{
 		Username: username,
 		Password: password,
@@ -70,14 +77,17 @@ func login(logout chan bool) {
 	} else if status == "0" {
 		log.Print("登录成功")
 	}
-	cancel := make(chan bool)
-	go watchSms(cancel)
+	now := time.Now()
 	for {
 		islogin, err := requestGet("/api/tmp/IS_LOGGED_IN")
 		if err != nil {
 			log.Print(err)
 		}
 		log.Print("是否登录: ", strings.TrimSpace(islogin))
+		if strings.TrimSpace(islogin) == "0" {
+			logout <- now.UnixMilli()
+			return
+		}
 
 		hb, err := requestGet("/api/tmp/heartbeat")
 		if err != nil {
@@ -85,11 +95,11 @@ func login(logout chan bool) {
 		}
 		log.Print("心跳请求: ", strings.TrimSpace(hb))
 
-		if strings.TrimSpace(islogin) == "0" || strings.TrimSpace(hb) != "true" {
-			close(cancel)
-			logout <- true
+		if strings.TrimSpace(hb) != "true" {
+			logout <- now.UnixMilli()
 			return
 		}
+		watchSms()
 
 		<-time.After(3 * time.Second)
 	}
@@ -99,28 +109,19 @@ type NewSmsFlag struct {
 	NewSmsFlag string `json:"new_sms_flag"`
 }
 
-func watchSms(cancel chan bool) {
-	for {
-		select {
-		case <-cancel:
-			log.Print("退出监听短信")
-			return
-		default:
-		}
-		smsFlag, err := requestGet("/api/tmp/FHAPIS?ajaxmethod=get_new_sms")
-		if err != nil {
-			log.Print(err)
-		}
-		var data = new(NewSmsFlag)
-		err = json.Unmarshal([]byte(smsFlag), data)
-		if err != nil {
-			log.Print(err)
-		}
-		log.Print("是否有新短信: ", strings.TrimSpace(data.NewSmsFlag))
-		if strings.TrimSpace(data.NewSmsFlag) == "true" {
-			smsNotice()
-		}
-		<-time.After(3 * time.Second)
+func watchSms() {
+	smsFlag, err := requestGet("/api/tmp/FHAPIS?ajaxmethod=get_new_sms")
+	if err != nil {
+		log.Print(err)
+	}
+	var data = new(NewSmsFlag)
+	err = json.Unmarshal([]byte(smsFlag), data)
+	if err != nil {
+		log.Print(err)
+	}
+	log.Print("是否有新短信: ", strings.TrimSpace(data.NewSmsFlag))
+	if strings.TrimSpace(data.NewSmsFlag) == "true" {
+		smsNotice()
 	}
 }
 
