@@ -4,8 +4,6 @@ on:
   push:
     tags:
       - 'v*.*.*'
-  release:
-    types: [created]
 
 jobs:
 
@@ -26,13 +24,16 @@ jobs:
     steps:
     - name: Checkout Code
       uses: actions/checkout@v4
-      
-    - name: Create a Release
-      uses: elgohr/Github-Release-Action@v5
+
+    - name: Create release
       env:
-        GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      with:
-        title: MyReleaseMessage
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        tag: ${{ github.ref_name }}
+      run: |
+        gh release create "$tag" \
+            --repo="$GITHUB_REPOSITORY" \
+            --title="${GITHUB_REPOSITORY#*/} ${tag#v}" \
+            --generate-notes
 
     - name: Build Golang
       uses: wangyoucao577/go-release-action@v1
