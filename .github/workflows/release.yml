@@ -15,11 +15,9 @@ jobs:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         tag: ${{ github.ref_name }}
       run: |
-        commits_log=$(git log --pretty=format:"- %s" HEAD~1..HEAD)
         gh release create "$tag" \
             --repo="$GITHUB_REPOSITORY" \
-            --title="${tag}" \
-            -n "$commits_log"
+            --title="${tag}"
 
   build:
     runs-on: ubuntu-latest
