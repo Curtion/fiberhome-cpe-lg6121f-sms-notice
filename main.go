@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"encoding/json"
 	"flag"
 	"fmt"
@@ -15,15 +16,17 @@ var (
 	username string
 	password string
 	waitTime int
-	brakKey  string
+	sound    string
+	barkKeys string
 	url      string
 )
 
 func init() {
 	flag.StringVar(&username, "u", "", "username")
 	flag.StringVar(&password, "p", "", "password")
-	flag.IntVar(&waitTime, "w", 10, "wait time")
-	flag.StringVar(&brakKey, "b", "", "bark key")
+	flag.IntVar(&waitTime, "w", 1, "wait time")
+	flag.StringVar(&sound, "s", "healthnotification", "sound")
+	flag.StringVar(&barkKeys, "b", "", "bark keys (comma separated)")
 	flag.StringVar(&url, "url", "http://192.168.8.1", "5g cpe url")
 }
 
@@ -178,20 +181,58 @@ func readSms(id string) {
 	log.Printf("短信[%s]已读: %s", id, res)
 }
 
+type BarkPushRequest struct {
+	Title      string   `json:"title"`
+	Body       string   `json:"body"`
+	Sound      string   `json:"sound"`
+	Group      string   `json:"group"`
+	DeviceKeys []string `json:"device_keys"`
+}
+
 func barkNotice(title, content string) (string, error) {
-	if brakKey == "" {
-		return "", fmt.Errorf("bark key is empty")
+	if barkKeys == "" {
+		return "", fmt.Errorf("bark keys is empty")
 	}
-	url := fmt.Sprintf("https://api.day.app/%s/%s/%s?level=timeSensitive", brakKey, title, content)
-	resp, err := http.Get(url)
+
+	keys := strings.Split(barkKeys, ",")
+	var deviceKeys []string
+	for _, key := range keys {
+		key = strings.TrimSpace(key)
+		if key != "" {
+			deviceKeys = append(deviceKeys, key)
+		}
+	}
+
+	if len(deviceKeys) == 0 {
+		return "", fmt.Errorf("no valid bark keys provided")
+	}
+
+	pushRequest := BarkPushRequest{
+		Title:      title,
+		Body:       content,
+		Sound:      fmt.Sprintf("%s.caf", sound),
+		Group:      "sms",
+		DeviceKeys: deviceKeys,
+	}
+
+	jsonData, err := json.Marshal(pushRequest)
 	if err != nil {
-		return "", err
+		return "", fmt.Errorf("failed to marshal request: %v", err)
+	}
+
+	resp, err := http.Post(
+		"https://api.day.app/push",
+		"application/json; charset=utf-8",
+		bytes.NewBuffer(jsonData),
+	)
+	if err != nil {
+		return "", fmt.Errorf("failed to send request: %v", err)
 	}
 	defer resp.Body.Close()
 
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
-		return "", err
+		return "", fmt.Errorf("failed to read response: %v", err)
 	}
 
 	return string(body), nil
