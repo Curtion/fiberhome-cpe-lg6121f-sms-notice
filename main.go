@@ -24,7 +24,7 @@ var (
 func init() {
 	flag.StringVar(&username, "u", "", "username")
 	flag.StringVar(&password, "p", "", "password")
-	flag.IntVar(&waitTime, "w", 1, "wait time")
+	flag.IntVar(&waitTime, "w", 10, "wait time")
 	flag.StringVar(&sound, "s", "healthnotification", "sound")
 	flag.StringVar(&barkKeys, "b", "", "bark keys (comma separated)")
 	flag.StringVar(&url, "url", "http://192.168.8.1", "5g cpe url")

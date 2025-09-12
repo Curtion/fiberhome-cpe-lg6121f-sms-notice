@@ -28,23 +28,5 @@
 # 编译
 
 ```shell
-# Windows PowerShell
-$env:GOOS="darwin"; $env:GOARCH="amd64"; go build -o ./bin/fh_sms_notice-v0.0.3-darwin-amd64 main.go aes.go fiberhome.go
-$env:GOOS="darwin"; $env:GOARCH="arm64"; go build -o ./bin/fh_sms_notice-v0.0.3-darwin-arm64 main.go aes.go fiberhome.go
-$env:GOOS="linux"; $env:GOARCH="386"; go build -o ./bin/fh_sms_notice-v0.0.3-linux-386 main.go aes.go fiberhome.go
-$env:GOOS="linux"; $env:GOARCH="amd64"; go build -o ./bin/fh_sms_notice-v0.0.3-linux-amd64 main.go aes.go fiberhome.go
-$env:GOOS="linux"; $env:GOARCH="arm64"; go build -o ./bin/fh_sms_notice-v0.0.3-linux-arm64 main.go aes.go fiberhome.go
-$env:GOOS="windows"; $env:GOARCH="386"; go build -o ./bin/fh_sms_notice-v0.0.3-windows-386.exe main.go aes.go fiberhome.go
-$env:GOOS="windows"; $env:GOARCH="amd64"; go build -o ./bin/fh_sms_notice-v0.0.3-windows-amd64.exe main.go aes.go fiberhome.go
-```
-
-```shell
-# Linux/macOS Bash
-GOOS=darwin GOARCH=amd64 go build -o ./bin/fh_sms_notice-v0.0.3-darwin-amd64 main.go aes.go fiberhome.go
-GOOS=darwin GOARCH=arm64 go build -o ./bin/fh_sms_notice-v0.0.3-darwin-arm64 main.go aes.go fiberhome.go
-GOOS=linux GOARCH=386 go build -o ./bin/fh_sms_notice-v0.0.3-linux-386 main.go aes.go fiberhome.go
-GOOS=linux GOARCH=amd64 go build -o ./bin/fh_sms_notice-v0.0.3-linux-amd64 main.go aes.go fiberhome.go
-GOOS=linux GOARCH=arm64 go build -o ./bin/fh_sms_notice-v0.0.3-linux-arm64 main.go aes.go fiberhome.go
-GOOS=windows GOARCH=386 go build -o ./bin/fh_sms_notice-v0.0.3-windows-386.exe main.go aes.go fiberhome.go
-GOOS=windows GOARCH=amd64 go build -o ./bin/fh_sms_notice-v0.0.3-windows-amd64.exe main.go aes.go fiberhome.go
+go build ./...
 ```
